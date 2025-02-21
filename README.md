@@ -2,7 +2,7 @@
 
 **Seamlessly watch movies together with friends, featuring real-time chat, live video/audio sync, and interactive controls.**  
 
-![Watch Party Hub Preview]([https://your-image-link.gif](https://i.pinimg.com/originals/4c/f5/3d/4cf53da7258a461a759bd607a4166fe4.gif))  
+![Watch Party Hub Preview]([[https://your-image-link.gif](https://i.pinimg.com/originals/4c/f5/3d/4cf53da7258a461a759bd607a4166fe4](https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExZ2FlZXZsdWVnN3FlemJ0cHFmOHU0ajF1MTFsY2NnNzVqazJteWt6YSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/CoWQutCxnRYAkoHuCJ/giphy.gif)  
 
 ---
 
