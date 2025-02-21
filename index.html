@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch Party Hub</title>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #111;
+            color: white;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            margin-top: 30px;
+            animation: fadeIn 1.5s ease-in-out;
+        }
+        .title {
+            font-size: 2rem;
+        }
+        .controls, .file-upload {
+            margin: 20px;
+        }
+        button {
+            padding: 10px;
+            margin: 10px;
+            background-color: #ff4b5c;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: 0.3s;
+            border-radius: 5px;
+        }
+        button:hover { background-color: #ff2e4d; }
+        input {
+            padding: 8px;
+            width: 70%;
+            border-radius: 5px;
+            border: none;
+            margin-top: 5px;
+            text-align: center;
+        }
+        video {
+            width: 60%;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+        .hidden { display: none; }
+        .chat-box {
+            margin-top: 20px;
+            border: 1px solid #fff;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            width: 50%;
+        }
+        #messages {
+            height: 150px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        #typingIndicator {
+            font-size: 0.9rem;
+            color: gray;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">🎬 Watch Party Hub 🍿</h1>
+
+        <!-- Room Creation & Joining -->
+        <div class="controls">
+            <button onclick="createRoom()">Create Room</button>
+            <input type="text" id="roomId" placeholder="Enter Room ID or Paste Link" onkeypress="handleKeyPress(event, joinRoom)">
+            <button onclick="joinRoom()">Join Room</button>
+            <button id="copyBtn" class="hidden" onclick="copyRoomLink()">Copy Link</button>
+        </div>
+
+        <!-- Video Selection -->
+        <div class="file-upload hidden" id="fileUpload">
+            <input type="file" id="videoFile" accept="video/*">
+            <input type="text" id="videoLink" placeholder="Or paste a video link">
+            <button onclick="loadVideo()">Load Video</button>
+        </div>
+
+        <!-- Video Section -->
+        <div class="hidden" id="videoSection">
+            <video id="videoPlayer" controls></video>
+        </div>
+
+        <!-- Chat Section -->
+        <div class="chat-box hidden" id="chatBox">
+            <div id="messages"></div>
+            <input type="text" id="messageInput" placeholder="Type a message..." oninput="showTyping()" onkeypress="handleKeyPress(event, sendMessage)">
+            <button onclick="sendMessage()">Send</button>
+            <p id="typingIndicator" class="hidden">Someone is typing...</p>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let roomId = "";
+        let isTyping = false;
+        let typingTimeout;
+
+        function handleKeyPress(event, action) {
+            if (event.key === "Enter") action();
+        }
+
+        function createRoom() {
+            roomId = "room-" + Math.random().toString(36).substring(2, 10);
+            socket.emit('create-room', { roomId });
+            setupRoom(roomId);
+            document.getElementById("copyBtn").classList.remove("hidden");
+        }
+
+        function joinRoom() {
+            const inputRoomId = document.getElementById("roomId").value.trim();
+            if (inputRoomId) {
+                roomId = inputRoomId.includes("room-") ? inputRoomId : `room-${inputRoomId}`;
+                socket.emit('join-room', { roomId });
+                setupRoom(roomId);
+            }
+        }
+
+        function setupRoom(roomId) {
+            document.getElementById("fileUpload").classList.remove("hidden");
+            document.getElementById("chatBox").classList.remove("hidden");
+            window.history.pushState({}, "", `?room=${roomId}`);
+        }
+
+        function copyRoomLink() {
+            const url = window.location.href;
+            navigator.clipboard.writeText(url);
+            alert("Room link copied!");
+        }
+
+        function loadVideo() {
+            const file = document.getElementById("videoFile").files[0];
+            const link = document.getElementById("videoLink").value;
+            const videoPlayer = document.getElementById("videoPlayer");
+
+            if (file) {
+                const url = URL.createObjectURL(file);
+                videoPlayer.src = url;
+                syncVideo("load", url);
+            } else if (link) {
+                videoPlayer.src = link;
+                syncVideo("load", link);
+            }
+
+            document.getElementById("videoSection").classList.remove("hidden");
+            setupVideoSync();
+        }
+
+        function setupVideoSync() {
+            const videoPlayer = document.getElementById("videoPlayer");
+            
+            videoPlayer.onplay = () => syncVideo("play");
+            videoPlayer.onpause = () => syncVideo("pause");
+            videoPlayer.ontimeupdate = () => syncVideo("seek", videoPlayer.currentTime);
+        }
+
+        function syncVideo(action, value) {
+            socket.emit("sync-video", { roomId, action, value });
+        }
+
+        socket.on("sync-video", (data) => {
+            const videoPlayer = document.getElementById("videoPlayer");
+            if (data.action === "load") videoPlayer.src = data.value;
+            if (data.action === "play") videoPlayer.play();
+            if (data.action === "pause") videoPlayer.pause();
+            if (data.action === "seek") videoPlayer.currentTime = data.value;
+        });
+
+        function sendMessage() {
+            const message = document.getElementById("messageInput").value;
+            if (message.trim()) {
+                socket.emit('chat-message', { roomId, message });
+                document.getElementById("messageInput").value = "";
+            }
+        }
+
+        socket.on('chat-message', (data) => {
+            const messages = document.getElementById("messages");
+            const msgElement = document.createElement("p");
+            msgElement.textContent = data.message;
+            messages.appendChild(msgElement);
+        });
+
+        function showTyping() {
+            if (!isTyping) {
+                isTyping = true;
+                socket.emit('typing', { roomId });
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => isTyping = false, 3000);
+            }
+        }
+
+        socket.on('typing', () => {
+            document.getElementById("typingIndicator").classList.remove("hidden");
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => document.getElementById("typingIndicator").classList.add("hidden"), 3000);
+        });
+    </script>
+</body>
+</html>
